@@ -1,0 +1,643 @@
+---
+title: "Bellabeat"
+author: "Hellen Atieno"
+date: "2022-12-16"
+output:
+  html_document:
+    number_section: true
+    toc: true
+  
+---
+
+# Summary  
+Bellabeat is a high-tech manufacturer of health-focused products for women.They offer smart fitness devices to their users which collect data on activity, sleep, stress and reproductive health. This data allows Bellabeat to empower women with knowledge about their own health and habits.
+
+Urška Sršen, cofounder and Chief Creative Oﬃcer of Bellabeat, believes that analyzing smart device ﬁtness data could help unlock new growth opportunities for the company. This case study will focus on one of Bellabeat's products and analyze the smart device data, to gain insights on how consumers are using their smart devices.
+
+The product we will analyze is, Bellabeat app. Bellabeat app provides users with health data related to their activity, sleep, stress, menstrual cycle, and mindfulness habits. This data can help users better understand their current habits and make healthy decisions. 
+
+The case study has been done in phases namely: **Ask, Prepare, Process, Analyze, Share and Act Phase.**
+
+
+
+# **Ask Phase**  
+## Business Task  
+The business task is to analyze smart device usage data in order to gain insight into how consumers use non-Bellabeat smart devices.
+
+## Stakeholders  
+The stakeholders include:  
+
+ 1. Urška Sršen: Bellabeat’s cofounder and Chief Creative Oﬃcer.
+ 
+ 2. Sando Mur: Mathematician and Bellabeat’s cofounder. 
+ 
+ 3. Bellabeat marketing analytics team.
+
+
+# **Prepare Phase**  
+## Data Source  
+The dataset used was downloaded from [FitBit Fitness Tracker Data](https://www.kaggle.com/arashnic/fitbit), a public domain. The dataset was made available through [Mobius](https://www.kaggle.com/arashnic).
+
+## Data Consent  
+This Kaggle data set contains personal ﬁtness tracker from thirty ﬁtbit users. Thirty eligible Fitbit users consented to the submission of personal tracker data, including minute-level output for physical activity, heart rate, and sleep monitoring. It includes information about daily activity, steps, and heart rate that can be used to explore users’ habits. 
+
+## Data Organization  
+The datasets in total are 18 CSV documents. The data in each document is in long format that is, each row is a one time point per subject so each  subject has data in multiple rows.
+
+## Data Limitations  
+The data set contains personal ﬁtness tracker from thirty ﬁtbit users. We therefore have a limitation in terms of size and we could encounter sampling bias as the sample data may not be representative of the whole population. 
+
+
+# **Process Phase** 
+The tool used to analyze and manipulate the data was R as it provides cleaning and data visualization tools that can be used in manipulating the data.
+
+## Libraries 
+The following libraries were used:
+
+1. tidyverse
+
+2. lubridate
+
+3. readr
+
+4. janitor
+
+5. skimr
+```{r}
+library(tidyverse)
+library(lubridate)
+library(readr)
+library(skimr)
+library(janitor)
+```
+
+
+## Importing the data  
+We will then import the data sets that we will be using for our analysis.  
+
+We will import the following data sets:
+
+1. DailyActivity
+
+2. DailySleep
+
+3. HourlySteps
+```{r}
+daily_activity <- read.csv('Datasets/dailyActivity_merged.csv')
+hourly_steps <- read.csv('Datasets/hourlySteps_merged.csv')
+daily_sleep <- read.csv('Datasets/sleepDay_merged.csv')
+
+```
+
+## Preview our data  
+We will check the summary of our data and have a preview of the data.
+```{r}
+nrow(daily_activity)
+head(daily_activity)
+str(daily_activity)
+
+nrow(hourly_steps)
+head(hourly_steps)
+str(hourly_steps)
+
+nrow(hourly_steps)
+head(daily_sleep)
+str(daily_sleep)
+```
+
+
+## Data Cleaning  
+Now we will clean and transform our data so we can work with it effectively.
+
+### Removing duplicates  
+We then check for duplicates
+```{r}
+sum(duplicated(daily_activity))
+sum(duplicated(hourly_steps))
+sum(duplicated(daily_sleep))
+```
+
+We then remove the duplicates and drop all rows containing n/a 
+```{r}
+daily_activity <- daily_activity%>%
+  distinct()%>%
+  drop_na()
+
+hourly_steps <- hourly_steps %>%
+  distinct() %>%
+  drop_na()
+
+daily_sleep <- daily_sleep %>%
+  distinct() %>%
+  drop_na()
+```
+
+To verify that the duplicates in daily_sleep datasets have been removed we will run the following code:
+```{r}
+sum(duplicated(daily_sleep))
+```
+
+
+### Renaming and cleaning column names  
+To ensure there is consistency in our data sets, we will change the case of our columns to lower case and make the date column consistent.
+
+We then change the case to lower
+```{r}
+daily_activity <- rename_with(daily_activity, tolower)
+hourly_steps <- rename_with(hourly_steps, tolower)
+daily_sleep <- rename_with(daily_sleep, tolower)
+```
+
+
+We then make the date to be consistent
+```{r}
+daily_activity <- rename(daily_activity, date = activitydate)
+hourly_steps <- rename(hourly_steps, date_time = activityhour)
+daily_sleep <- rename(daily_sleep, date = sleepday)
+
+```
+
+
+We verify our data sets
+```{r}
+head(daily_activity)
+head(hourly_steps)
+head(daily_sleep)
+```
+
+
+### Make time in date column consistent  
+```{r}
+daily_activity <- mutate(daily_activity, date = as_date(date, format = "%m/%d/%Y"))
+daily_sleep <- mutate(daily_sleep, date = as_date(date,format ="%m/%d/%Y %I:%M:%S %p" , tz=Sys.timezone()))
+hourly_steps <- mutate(hourly_steps, date_time = as.POSIXct(date_time, format = "%m/%d/%Y %I:%M:%S %p", tz=Sys.timezone()))
+
+```
+
+Let's verify the data sets
+```{r}
+head(daily_activity)
+head(hourly_steps)
+head(daily_sleep)
+```
+
+
+## Merge the data sets  
+We will merge two data sets: daily_activity and daily_sleep. We will use the merged data set to further our analysis.
+```{r}
+daily_activity_sleep <- merge(daily_activity, daily_sleep, by=c ("id", "date"))
+glimpse(daily_activity_sleep)
+
+```
+
+
+
+
+# **Analyze and Share Phase**  
+## Classification of type of user by activity  
+We can classify the users by activity, considering the daily amount of steps they take.
+We can categorize users as follows:
+
+ 1. Sedentary - Less than 5000 steps a day.
+ 
+ 2. Lightly active - Between 5000 and 7499 steps a day.
+ 
+ 3. Fairly active - Between 7500 and 9999 steps a day.
+ 
+ 4.  Very active - More than 10000 steps a day.
+
+We first of all calculate the average steps of the users.
+```{r}
+daily_average_activities <- daily_activity_sleep %>%
+  group_by(id) %>%
+  summarise(average_steps = mean(totalsteps))
+
+head(daily_average_activities)
+
+
+```
+
+
+We will then use the average we've obtained above to classify our users by the average steps they take.
+```{r}
+user_type <- daily_average_activities %>%
+  mutate(user_type = case_when(average_steps < 5000 ~ 'sedentary',
+                               average_steps >= 5000 & average_steps < 7499 ~ 'lightly active',
+                               average_steps >= 7499 & average_steps < 9999 ~ 'fairly active',
+                               average_steps > 10000 ~ 'very active'))
+
+head(user_type)
+```
+
+
+Now we can get the percentage of each user type.
+```{r}
+usertype_percent <- user_type %>%
+  group_by(user_type) %>%
+  summarise(total = n()) %>%
+  mutate(total_users = sum(total)) %>% 
+  group_by(user_type) %>%
+  summarise(total_percent = total / total_users) %>% 
+  mutate(percentage = scales::percent(total_percent)) 
+
+usertype_percent$user_type <- factor(usertype_percent$user_type, levels = c('sedentary', 'lightly active', 'fairly active', 'very active'))
+
+head(usertype_percent)
+```
+
+
+Lets visualize the percentage of the user type.
+```{r}
+usertype_percent %>%
+  ggplot(aes(x = '' , y = total_percent, fill = user_type)) +
+  geom_bar(stat = 'identity' , width = 1) +
+  coord_polar('y' , start = 0) +
+  geom_text(aes(label = percentage), position = position_stack(vjust = 0.5)) +
+  scale_fill_manual(values = c('#55dde0', '#33658a',  '#f26419', '#f6ae2d')) +
+  labs(x = NULL, y = NULL, fill = NULL, title = 'Percentage of user type' ) +
+  theme_classic() +
+  theme(axis.line = element_blank(),
+        axis.text = element_blank(),
+        axis.ticks = element_blank(),
+        plot.title = element_text(hjust = 0.5,   face = 'bold'))
+  
+```
+
+
+Our analysis on the average steps taken based on the four types of users i.e sedentary, lightly active, fairly active and very active, reveals that 38% of the users are fairly active while each of the other three types of users are at 21%.
+
+
+## Amount of Sleep and steps per weekday.
+We want to know the daily average steps and sleep our users have per each day of the week. We will then verify this data to determine if the users have the recommended amount of sleep and if they take the recommended amount of steps.
+
+We will calculate the weekdays and then get the average steps and average amount of sleep in minutes our users have, during each day of the week.
+```{r}
+weekday_steps_sleep <- daily_activity_sleep %>%
+  mutate(weekday = weekdays(date))
+
+weekday_steps_sleep$weekday <- ordered(weekday_steps_sleep$weekday, levels = c("Monday", "Tuesday", 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'))
+
+weekday_steps_sleep <- weekday_steps_sleep %>%
+  group_by(weekday) %>%
+  summarise(average_steps = mean(totalsteps), average_sleep = mean(totalminutesasleep))
+
+head(weekday_steps_sleep)
+
+
+```
+
+
+The recommended amount of steps is 7500 and the recommended amount of sleep is on average 8hrs/480minutes.
+We will visualize our data on average steps and average sleep per weekday to get a better understanding on our users activities.
+
+The average steps:
+```{r}
+ggplot(data = weekday_steps_sleep) +
+  geom_col(mapping =aes(x = weekday, y = average_steps), fill = '#33658a') +
+  geom_hline(yintercept = 7500) +
+  labs(title = 'Average steps in a week', x = '', y = '') +
+  theme(axis.text.x = element_text(angle = 30, vjust = 0.5, hjust = .5))
+  
+```
+
+The average amount of sleep:
+```{r}
+ggplot(data = weekday_steps_sleep) +
+  geom_col(mapping =aes(x = weekday, y = average_sleep), fill = '#55de80') +
+  geom_hline(yintercept = 480) +
+  labs(title = 'Average sleep in minutes in a week', x ='', y='') +
+  theme(axis.text.x = element_text(angle = 30, vjust = .5, hjust = .5))
+
+```
+
+
+We can conclude that:
+ 
+ 1. The users take the recommended amount of steps everyday except on Sunday.
+ 
+ 2. The user do not take the recommended amount of sleep.
+ 
+ 
+##  Hourly Steps in a day  
+We want to know at what time of the day are our users most active. We will use  the hourly_steps data frame.
+```{r}
+hourly_steps <- hourly_steps %>%
+  separate(date_time, into = c("date", "time"), sep = " ") %>%
+  mutate(date = ymd(date))
+
+head(hourly_steps)
+
+```
+
+
+A visualization of the hourly steps taken throughout the day is as follows.
+```{r}
+hourly_steps %>%
+  group_by(time) %>%
+  summarise(average_steps = mean(steptotal)) %>%
+  ggplot(aes(x = time, y = average_steps, fill = average_steps)) +
+  geom_col() +
+  labs(title = "Hourly average steps in a day", x = "", y = "" ) +
+  scale_fill_gradient(low = "green", high = "orange") + 
+  theme(axis.text.x = element_text(angle = 90, vjust = .5, hjust = .5)) 
+
+```
+
+
+1. From the chart above we can see that users are normally active between 8am and 7pm. 
+
+2. The number of steps seem to increase at lunch hours that is, from 12pm to 2pm and during the evening from 5pm to 7pm.
+
+
+## Correlation  
+We will now determine if there is correlation between different variables.
+
+ 1. Daily steps and daily sleep. 
+ 
+ 2. Daily steps and calories.
+ 
+```{r}
+ggplot(data = daily_activity_sleep, mapping = aes(x = totalsteps, y = totalminutesasleep)) +
+  geom_jitter() +
+  geom_smooth(color = "blue") +
+  labs(title = "Daily steps vs Minutes asleep", x = 'Daily steps' , y = 'Minutes asleep') +
+  theme_bw()
+
+
+ggplot(data = daily_activity_sleep, mapping = aes(x = totalsteps, y = calories)) +
+  geom_jitter() +
+  geom_smooth(color = "blue") +
+  labs(title = "Daily steps vs Calories burnt", x = 'Daily steps' , y = 'Calories') +
+  theme_bw()
+  
+```
+
+
+We can determine from the charts above that:
+
+1. There is no correlation between daily activity level based on   steps and the amount of minutes users sleep a day.
+
+
+2. There is a positive correlation to amount of calories burnt and daily steps taken.
+
+
+## Smart device usage  
+### How long the smart devices are used.  
+We want to see how often do the users in our sample use their device. That way we can plan our marketing strategy and see what features would benefit the use of smart devices.
+
+We will calculate the number of users that use their smart device on a daily basis, classifying our sample into three categories knowing that the date interval is 31 days:
+
+a. high users - users who use their device between 21 to 31 days.
+
+b. moderate users - users who use their device between 11 to 20 days.
+
+c. low users - users who use their device between 1 to 10 days.
+
+First we will create a new data frame grouping by Id, calculating number of days used and creating a new column with the classification explained above.
+```{r}
+daily_usage <- daily_activity_sleep %>%
+  group_by(id) %>%
+  summarise(days_used = sum(n())) %>%
+  mutate(usage = case_when(days_used >= 21 & days_used <= 31 ~ "high users",
+                           days_used >= 11 & days_used <= 20 ~ "moderate users",
+                           days_used >= 1 & days_used <= 10 ~ "low users"))
+
+head(daily_usage)
+
+```
+
+
+We will now represent the daily usage in percentage form. 
+```{r}
+usage_percent <- daily_usage %>%
+  group_by(usage) %>%
+  summarise(total = n()) %>%
+  mutate(total_sum = sum(total)) %>%
+  group_by(usage) %>%
+  summarise(total_percent = total / total_sum) %>%
+  mutate(percentage = scales::percent(total_percent))
+
+usage_percent$usage <- factor(usage_percent$usage, levels = c("high users", "moderate users", "low users"))
+
+head(usage_percent)
+```
+
+
+We will then visualize the above percentage usage.
+```{r}
+usage_percent %>%
+  ggplot(aes(x = '' , y = total_percent, fill = usage)) +
+  geom_bar(stat = 'identity' , width = 1) +
+  coord_polar('y' , start = 0) +
+  geom_text(aes(label = percentage), position = position_stack(vjust = 0.5)) +
+  labs(x = "", y = "", fill = NULL, title = 'Percentage usage of smart devices' ) + 
+  theme_classic() + 
+  theme(axis.line = element_blank(),
+        axis.text = element_blank(),
+        axis.ticks = element_blank(),
+        plot.title = element_text(hjust = 0.5,   face = 'bold')) +
+  scale_fill_manual(values = c("#006699", "#00e688", "#85e0e0"),
+                    labels = c("High use - 21 to 31 days",
+                               "Moderate use - 11 to 20 days",
+                               "Low use - 1 to 10 days")) 
+
+
+```
+
+
+We can obtain the following conclusion from the above data:
+
+1. 50% of users are high users,  use smart devices between 21 - 31 days.
+
+2. 12% of userrs are moderate users, use smart devices between 11 - 20 days.
+
+3. 38% of users are low users, use smart devices between 1 - 10 days.
+
+
+### Smart device daily usage data  
+We will then determine how many minutes users use their smart devices per day. To do that we will merge these two data frames: daily_usage and daily_activity.
+```{r}
+daily_usage_activity <- merge(daily_activity, daily_usage, by = c('id'))
+glimpse(daily_usage_activity)
+head(daily_usage_activity)
+```
+
+
+We need to create a new data frame calculating the total amount of minutes users wore the device every day and creating three different categories:
+
+a. All day - device was worn all day.
+
+b. More than half day - device was worn more than half of the day.
+
+c. Less than half day - device was worn less than half of the day.
+```{r}
+active_duration <- daily_usage_activity %>%
+  mutate(total_active_duration = veryactiveminutes + lightlyactiveminutes + fairlyactiveminutes + sedentaryminutes) %>%
+  mutate(active_duration_percent = (total_active_duration / 1440) * 100) %>%
+  mutate(active = case_when(active_duration_percent == 100 ~ "All day",
+                            active_duration_percent >= 50 & active_duration_percent < 100 ~ "More than half a day",
+                            active_duration_percent >0 & active_duration_percent < 50 ~ "Less than half a day"))
+
+
+head(active_duration)
+
+```
+
+
+To better our visualization of the data we will create new data frames.
+
+a. Our first data frame will contain data on the percentage duration our users have their devices on them.
+
+b. We will then make three other data frames. These data frames will contain data on percentage duration our users have their devices on them depending on their daily usage.
+
+```{r}
+active_percent <- active_duration %>%
+  group_by(active) %>%
+  summarise(total = n()) %>%
+  mutate(totals = sum(total)) %>%
+  group_by(active) %>%
+  summarise(total_percent = total / totals) %>%
+  mutate(percentage = scales::percent(total_percent))
+
+
+highly_active <- active_duration %>%
+  filter(usage == "high users") %>%
+  group_by(active) %>% 
+  summarise(total = n()) %>%
+  mutate(totals = sum(total)) %>%
+  group_by(active) %>%
+  summarise(total_percent = total / totals) %>%
+  mutate(percentage = scales::percent(total_percent))
+  
+
+moderately_active <- active_duration %>%
+  filter(usage == "moderate users") %>%
+  group_by(active) %>%
+  summarise(total = n()) %>%
+  mutate(totals = sum(total)) %>%
+  group_by(active) %>%
+  summarise(total_percent = total / totals) %>%
+  mutate(percentage = scales::percent(total_percent))
+
+
+low_active <- active_duration %>%
+  filter(usage == "low users") %>%
+  group_by(active) %>%
+  summarise(total = n()) %>%
+  mutate(totals = sum(total)) %>%
+  group_by(active) %>%
+  summarise(total_percent = total / totals) %>%
+  mutate(percentage = scales::percent(total_percent))
+
+
+head(active_percent)
+head(highly_active)
+head(moderately_active)
+head(low_active)
+
+
+```
+
+
+
+Since we now have the data frames we can visualize this data to get a better understanding of it.
+```{r}
+active_percent %>%
+  ggplot(aes(x = "" , y = total_percent , fill = active)) +
+  geom_bar(stat = "identity", width = 1) +
+  coord_polar("y" , start = 0) +
+  geom_text(aes(label = percentage), position = position_stack(vjust = 0.5)) +
+  scale_fill_manual(values = c('#55dde0', '#33658a',  '#f26419')) +
+  labs(title = "Time worn in a day", x = "" , y = "") +
+  theme_classic() +
+  theme(axis.line = element_blank(),
+        axis.text = element_blank(),
+        axis.ticks = element_blank(),
+        plot.title = element_text(hjust = 0.5,   face = 'bold'))
+
+
+highly_active %>%
+  ggplot(aes(x = "" , y = total_percent , fill = active)) +
+  geom_bar(stat = "identity" , width = 1) +
+  coord_polar("y" , start = 0) +
+  geom_text(aes(label = percentage), position = position_stack(vjust = 0.5)) +
+  scale_fill_manual(values = c('#55dde0', '#33658a',  '#f26419')) +
+  labs(title = "Daily duration worn by high active users" , x = "" , y = "") +
+  theme_classic() +
+  theme(axis.line = element_blank(),
+        axis.text = element_blank(),
+        axis.ticks = element_blank(),
+        plot.title = element_text(hjust = 0.5, face = "bold"))
+  
+  
+moderately_active %>%
+  ggplot(aes(x = "", y = total_percent, fill = active)) +
+  geom_bar(stat = "identity", width = 1) +
+  coord_polar("y" , start = 0) +
+  geom_text(aes(label = percentage), position = position_stack(vjust = 0.5)) +
+  scale_fill_manual(values = c('#55dde0', '#33658a',  '#f26419')) +
+  labs(title = "Daily duration worn by moderate users" , x = "" , y = "") +
+  theme_classic() +
+  theme(axis.line = element_blank(),
+        axis.text = element_blank(),
+        axis.ticks = element_blank(),
+        plot.title = element_text(hjust = 0.5, face = "bold"))
+
+
+low_active %>%
+  ggplot(aes(x = "", y = total_percent, fill = active)) +
+  geom_bar(stat = "identity" , width = 1) +
+  coord_polar("y" , start = 0) +
+  geom_text(aes(label = percentage), position = position_stack(vjust = 0.5)) +
+  scale_fill_manual(values = c('#55dde0', '#33658a',  '#f26419')) +
+  labs(title = "Daily duration worn by low users", x = "", y = "") +
+  theme_classic() +
+  theme(axis.line = element_blank(),
+        axis.text = element_blank(),
+        axis.ticks = element_blank(),
+        plot.title = element_text(hjust = 0.5, face = "bold"))
+
+```
+
+
+
+# **Act Phase**  
+Bellabeat uses data they collect to empower women with knowledge about their own health and habits.In this case study we analyzed smart device data from Bellabeat's product to gain insight on how the consumers are using their smart devices.
+
+Future analysis with data sets that have a wider sample is recommended as using a small sample like the one we used, can cause sampling bias.
+
+## Findings  
+In our analysis we came across different trends that gave us much insight on how Bellabeat's products are being used. Some of the findings include. 
+
+a. 38% of the users are fairly active i.e they take an average of between 7450 to 9999 steps per day.
+
+b. On average the users take the recommended amount of steps i.e 7500 steps, throughout the week except on Sunday where there is a slight drop. The users do not take the recommended amount of sleep i.e 8hrs.
+
+c. Based on average steps taken in a day, we realized that users are active between 8am and 7pm with a slight increase around lunch hours and in the evening.
+
+d. We did find a positive correlation between daily steps taken vs calories burnt but no correlation was seen between daily steps vs minutes slept.
+
+e. We discovered that 50% of the users use their smart devices 21 to 30 days. 38% were low users  (1 - 10 days) and 12% were moderate users (11 -20 days)
+
+f. We found that 36% of the users had their Bellabeat's smart devices on them all day and 60% had them on for more than half a day.
+
+g. Of the 50% high users, only 6.8% of them had their devices on them all day long while 88.9% of them had their devices on them for more than half a day.
+
+h. 69% of the moderate users had their devices on them more than half a day while 27% of the moderate users had their devices on them all day.
+
+i. 80% of low users had their devices on them all day long while only 18% of the low users had their devices on them for more than half a day.
+
+
+
+## Recommendation  
+1. Daily reminders and notifications on step taken. This would remind the users to take their daily target steps and notify them on their daily performance. 
+
+2. Daily reminders and notification on sleep. They users could set the desire time they want to go to sleep and receive reminders a few minutes before this time so they can prepare.
+
+3. 
+
+
+
+
+
+
